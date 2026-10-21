@@ -70,8 +70,6 @@
   .pill.live { color: var(--ok); }
   .pill.offline { color: var(--bad); }
   .pill.offline .dot { background: var(--bad); }
-  .pill.demo { color: var(--warn); }
-  .pill.demo .dot { background: var(--warn); }
   @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 60%, transparent); } 100% { box-shadow: 0 0 0 8px transparent; } }
   .updated { color: var(--muted); font-size: 13px; }
 
@@ -212,7 +210,7 @@ const CONFIG = {
     databaseURL: "https://iot-129-88357-default-rtdb.asia-southeast1.firebasedatabase.app",
   },
   DB_NAME: "iot-129",
-  OWNER: "ชื่อ-นามสกุล · รหัสนักศึกษา",
+  OWNER: "รหัสนักศึกษา 6710886129",
   HISTORY_POINTS: 60,     // จำนวนจุดในกราฟ
   SEND_INTERVAL_S: 10,    // ต้องตรงกับ send_interval ใน ESPHome
 };
@@ -242,7 +240,6 @@ const ADVICE = [
 
 // ===========================================================================
 const $ = id => document.getElementById(id);
-const isDemo = new URLSearchParams(location.search).has("demo") || /YOUR-/.test(CONFIG.FIREBASE.databaseURL);
 let latest = null;
 let history = [];
 let selected = FIELDS[0].key;
@@ -380,7 +377,6 @@ function updateClock() {
   if (!latest || !latest.ts) return;
   const age = Math.max(0, Math.round((Date.now() - latest.ts) / 1000));
   $("updated").textContent = `อัปเดตล่าสุด ${fmtTime(latest.ts)} (${age} วินาทีที่แล้ว)`;
-  if (isDemo) return setPill("demo", "โหมดสาธิต");
   if (age > CONFIG.SEND_INTERVAL_S * 3) setPill("offline", "ESP32 ออฟไลน์");
   else setPill("live", "Real-time");
 }
@@ -410,34 +406,12 @@ async function startFirebase() {
   }, onErr);
 }
 
-function startDemo() {
-  showBanner("โหมดสาธิต: ข้อมูลในหน้านี้สุ่มในเบราว์เซอร์ ยังไม่ได้ต่อ Firebase — ใส่ databaseURL ใน CONFIG แล้วหน้าจะแสดงข้อมูลจริงจาก ESP32");
-  const s = { temperature: 29, humidity: 66, soil: 48, light: 21000, co2: 720, water_level: 40, rssi: -62, uptime: 3600 };
-  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-  const step = () => {
-    s.temperature = +clamp(s.temperature + (Math.random() - .45) * .8, 22, 38).toFixed(1);
-    s.humidity = Math.round(clamp(s.humidity + (Math.random() - .5) * 3, 35, 95));
-    s.soil = s.soil < 20 ? 80 : Math.round(s.soil - .6 - Math.random() * .6);
-    s.light = Math.round(clamp(s.light + (Math.random() - .5) * 3000, 500, 60000));
-    s.co2 = Math.round(clamp(s.co2 + (Math.random() - .45) * 80, 400, 1800));
-    s.water_level = s.water_level < 5 ? 100 : Math.round(s.water_level - .2 - Math.random() * .3);
-    s.rssi = Math.round(clamp(s.rssi + (Math.random() - .5) * 4, -90, -45));
-    s.uptime += CONFIG.SEND_INTERVAL_S;
-    return { ...s, ts: Date.now() };
-  };
-  const seed = [];
-  for (let i = CONFIG.HISTORY_POINTS; i > 0; i--) seed.push({ ...step(), ts: Date.now() - i * CONFIG.SEND_INTERVAL_S * 1000 });
-  setHistory(seed); setLatest(seed[seed.length - 1]);
-  setInterval(() => { const r = step(); history.push(r); setHistory(history.slice(-CONFIG.HISTORY_POINTS)); setLatest(r); }, 2000);
-}
-
 // --- start --------------------------------------------------------------------
 $("dbName").textContent = `Firebase · ${CONFIG.DB_NAME}`;
 $("owner").textContent = CONFIG.OWNER;
 buildCards();
 setInterval(updateClock, 1000);
-if (isDemo) startDemo();
-else startFirebase().catch(e => showBanner(`โหลด Firebase ไม่สำเร็จ: ${e.message}`, true));
+startFirebase().catch(e => showBanner(`โหลด Firebase ไม่สำเร็จ: ${e.message}`, true));
 </script>
 </body>
 </html>
