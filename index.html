@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Greenhouse Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f3f5f0;
+    --surface: #ffffff;
+    --surface-2: #eef2ea;
+    --text: #1b261d;
+    --muted: #5d6c60;
+    --border: #dbe3d5;
+    --accent: #2e7d4b;
+    --accent-soft: #e1efe5;
+    --ok: #2e7d4b;
+    --warn: #b26b00;
+    --bad: #c23a1a;
+    --ok-soft: #e1efe5;
+    --warn-soft: #fbefd9;
+    --bad-soft: #fbe3dc;
+    --grid: #e6ebe2;
+    --shadow: 0 1px 2px rgba(20, 40, 25, .06), 0 4px 16px rgba(20, 40, 25, .05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1410;
+      --surface: #161f19;
+      --surface-2: #1c2820;
+      --text: #e4ede5;
+      --muted: #97ab9b;
+      --border: #27362c;
+      --accent: #5cc283;
+      --accent-soft: #1d3325;
+      --ok: #5cc283;
+      --warn: #f0b44c;
+      --bad: #f27b5a;
+      --ok-soft: #1d3325;
+      --warn-soft: #3a2e17;
+      --bad-soft: #3d2019;
+      --grid: #222e26;
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "IBM Plex Sans Thai", system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 16px 48px; }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+  /* header */
+  header { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; justify-content: space-between; margin-bottom: 20px; }
+  .eyebrow { color: var(--muted); font-size: 13px; letter-spacing: .02em; }
+  h1 { font-size: clamp(22px, 4vw, 30px); margin: 2px 0 0; font-weight: 700; }
+  .status { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; font-weight: 600; font-size: 13px; background: var(--surface-2); border: 1px solid var(--border); }
+  .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .pill.live .dot { background: var(--ok); box-shadow: 0 0 0 0 var(--ok); animation: pulse 2s infinite; }
+  .pill.live { color: var(--ok); }
+  .pill.offline { color: var(--bad); }
+  .pill.offline .dot { background: var(--bad); }
+  .pill.demo { color: var(--warn); }
+  .pill.demo .dot { background: var(--warn); }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 60%, transparent); } 100% { box-shadow: 0 0 0 8px transparent; } }
+  .updated { color: var(--muted); font-size: 13px; }
+
+  .banner { display: none; margin-bottom: 16px; padding: 10px 14px; border-radius: 10px; background: var(--warn-soft); color: var(--warn); font-size: 14px; }
+  .banner.show { display: block; }
+  .banner.error { background: var(--bad-soft); color: var(--bad); }
+
+  /* top row: health + advice */
+  .top { display: grid; grid-template-columns: minmax(220px, 300px) 1fr; gap: 16px; margin-bottom: 16px; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .panel h2 { font-size: 15px; margin: 0 0 12px; font-weight: 600; color: var(--muted); }
+  .health { display: flex; align-items: center; gap: 18px; }
+  .ring { --p: 0; --c: var(--ok); width: 96px; height: 96px; border-radius: 50%; flex: none;
+    background: conic-gradient(var(--c) calc(var(--p) * 1%), var(--surface-2) 0); display: grid; place-items: center; transition: --p .6s; }
+  .ring::before { content: ""; width: 74px; height: 74px; border-radius: 50%; background: var(--surface); grid-area: 1 / 1; }
+  .ring span { grid-area: 1 / 1; font-size: 24px; font-weight: 700; }
+  .health-text strong { display: block; font-size: 18px; }
+  .health-text small { color: var(--muted); }
+  .advice { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .advice li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); }
+  .advice li.warn { background: var(--warn-soft); }
+  .advice li.bad { background: var(--bad-soft); }
+  .advice li.ok { background: var(--ok-soft); }
+  .advice .tag { font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 6px; flex: none; margin-top: 2px; }
+  .advice li.warn .tag { color: var(--warn); border: 1px solid currentColor; }
+  .advice li.bad .tag { color: var(--bad); border: 1px solid currentColor; }
+  .advice li.ok .tag { color: var(--ok); border: 1px solid currentColor; }
+
+  /* KPI cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-bottom: 16px; }
+  .card { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 16px 12px; box-shadow: var(--shadow); cursor: pointer; transition: border-color .2s, transform .2s; text-align: left; font: inherit; color: inherit; }
+  .card:hover { transform: translateY(-1px); }
+  .card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .card::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px; border-radius: 0 3px 3px 0; background: var(--c, var(--border)); }
+  .card[data-status="ok"] { --c: var(--ok); }
+  .card[data-status="warn"] { --c: var(--warn); }
+  .card[data-status="bad"] { --c: var(--bad); }
+  .card-head { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 14px; }
+  .card-icon { font-size: 18px; }
+  .value { margin-top: 6px; display: flex; align-items: baseline; gap: 6px; }
+  .value .num { font-size: 32px; font-weight: 600; line-height: 1.1; }
+  .value .unit { color: var(--muted); font-size: 14px; }
+  .meta { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; font-size: 13px; color: var(--muted); min-height: 20px; }
+  .value .num.text { font-family: inherit; font-size: 22px; padding-top: 6px; }
+  .bar { height: 5px; border-radius: 3px; background: var(--surface-2); overflow: hidden; margin-top: 8px; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--c, var(--accent)); transition: width .6s; }
+  .spark { display: block; width: 100%; height: 34px; margin-top: 8px; }
+  .spark polyline { fill: none; stroke: var(--c, var(--accent)); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
+  .flash .num { animation: flash .8s; }
+  @keyframes flash { 0% { color: var(--accent); } 100% { color: inherit; } }
+
+  /* chart + table */
+  .chart-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .chart-head h2 { margin: 0; color: var(--text); font-size: 17px; }
+  .chart-box { position: relative; height: 300px; }
+  .table-panel { margin-top: 16px; }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; white-space: nowrap; }
+  th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--border); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; }
+  tbody tr:first-child td { background: var(--accent-soft); }
+  .btn { font: inherit; font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); cursor: pointer; }
+  .btn:hover { border-color: var(--accent); }
+  footer { margin-top: 28px; color: var(--muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: space-between; }
+
+  @media (max-width: 720px) {
+    .top { grid-template-columns: 1fr; }
+    .status { align-items: flex-start; }
+    .chart-box { height: 240px; }
+    .value .num { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow" id="dbName">Firebase · iot-999</div>
+      <h1>🌿 Smart Greenhouse Dashboard</h1>
+    </div>
+    <div class="status">
+      <span class="pill" id="pill"><span class="dot"></span><span id="pillText">กำลังเชื่อมต่อ…</span></span>
+      <span class="updated" id="updated">ยังไม่มีข้อมูล</span>
+    </div>
+  </header>
+
+  <div class="banner" id="banner"></div>
+
+  <section class="top">
+    <div class="panel">
+      <h2>สุขภาพโรงเรือน</h2>
+      <div class="health">
+        <div class="ring" id="ring"><span class="mono" id="score">–</span></div>
+        <div class="health-text">
+          <strong id="healthLabel">รอข้อมูล</strong>
+          <small id="healthSub">คำนวณจากค่าที่อยู่ในช่วงเหมาะสม</small>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>คำแนะนำตอนนี้</h2>
+      <ul class="advice" id="advice"><li><span>รอข้อมูลจาก ESP32…</span></li></ul>
+    </div>
+  </section>
+
+  <section class="cards" id="cards"></section>
+
+  <section class="panel">
+    <div class="chart-head">
+      <h2 id="chartTitle">กราฟย้อนหลัง</h2>
+      <span class="updated">คลิกการ์ดด้านบนเพื่อเปลี่ยนกราฟ</span>
+    </div>
+    <div class="chart-box"><canvas id="chart"></canvas></div>
+  </section>
+
+  <section class="panel table-panel">
+    <div class="chart-head">
+      <h2>ข้อมูลล่าสุด 10 รายการ</h2>
+      <button class="btn" id="csvBtn">ดาวน์โหลด CSV</button>
+    </div>
+    <div class="table-scroll"><table id="table"><thead></thead><tbody></tbody></table></div>
+  </section>
+
+  <footer>
+    <span id="owner"></span>
+    <span>ESP32 · ESPHome → Firebase Realtime Database → GitHub Pages</span>
+  </footer>
+</div>
+
+<script type="module">
+// ===========================================================================
+// ตั้งค่า — แก้เฉพาะส่วนนี้
+// ===========================================================================
+const CONFIG = {
+  // วาง firebaseConfig จาก Firebase Console ได้ทั้งก้อน หรือใส่แค่ databaseURL ก็พอ
+  FIREBASE: {
+    databaseURL: "https://iot-129-88357-default-rtdb.asia-southeast1.firebasedatabase.app",
+  },
+  DB_NAME: "iot-129",
+  OWNER: "ชื่อ-นามสกุล · รหัสนักศึกษา",
+  HISTORY_POINTS: 60,     // จำนวนจุดในกราฟ
+  SEND_INTERVAL_S: 10,    // ต้องตรงกับ send_interval ใน ESPHome
+};
+
+// ฟิลด์ที่แสดง (key ต้องตรงกับชื่อที่ ESP32 ส่งขึ้น Firebase)
+const FIELDS = [
+  { key: "temperature", label: "อุณหภูมิ",       unit: "°C",  dec: 1, min: 15,   max: 45,    icon: "🌡️", status: v => v > 35 ? "bad" : v > 32 ? "warn" : "ok" },
+  { key: "humidity",    label: "ความชื้นอากาศ",   unit: "%",   dec: 0, min: 0,    max: 100,   icon: "💧", status: v => v > 90 || v < 35 ? "warn" : "ok" },
+  { key: "soil",        label: "ความชื้นดิน",     unit: "%",   dec: 0, min: 0,    max: 100,   icon: "🌱", status: v => v < 25 ? "bad" : v < 35 ? "warn" : "ok" },
+  { key: "light",       label: "ความเข้มแสง",     unit: "lux", dec: 0, min: 0,    max: 60000, icon: "☀️", status: v => v < 5000 ? "warn" : "ok" },
+  { key: "co2",         label: "CO₂",            unit: "ppm", dec: 0, min: 300,  max: 2000,  icon: "🫧", status: v => v > 1500 ? "bad" : v > 1000 ? "warn" : "ok" },
+  { key: "water_level", label: "น้ำในถัง",        unit: "%",   dec: 0, min: 0,    max: 100,   icon: "🪣", status: v => v < 15 ? "bad" : v < 30 ? "warn" : "ok" },
+  { key: "rssi",        label: "สัญญาณ Wi-Fi",    unit: "dBm", dec: 0, min: -100, max: -30,   icon: "📶", status: v => v < -80 ? "bad" : v < -70 ? "warn" : "ok" },
+  { key: "uptime",      label: "ESP32 ทำงานมาแล้ว", unit: "",    dec: 0, icon: "⏱️", format: fmtDuration },
+];
+
+// คำแนะนำตามค่าปัจจุบัน
+const ADVICE = [
+  d => d.soil < 35 && { level: d.soil < 25 ? "bad" : "warn", text: `ดินแห้ง (${d.soil}%) — ควรรดน้ำต้นไม้` },
+  d => d.temperature > 32 && { level: d.temperature > 35 ? "bad" : "warn", text: `อุณหภูมิสูง (${d.temperature}°C) — เปิดพัดลมหรือม่านพรางแสง` },
+  d => d.co2 > 1000 && { level: d.co2 > 1500 ? "bad" : "warn", text: `CO₂ สูง (${d.co2} ppm) — เปิดระบายอากาศ` },
+  d => d.water_level < 30 && { level: d.water_level < 15 ? "bad" : "warn", text: `น้ำในถังเหลือ ${d.water_level}% — เติมน้ำ` },
+  d => d.light < 5000 && { level: "warn", text: `แสงน้อย (${fmtNum(d.light, 0)} lux) — เปิดไฟปลูก` },
+  d => d.humidity > 90 && { level: "warn", text: `ความชื้นอากาศสูง (${d.humidity}%) — เสี่ยงเชื้อรา` },
+  d => d.rssi < -80 && { level: "warn", text: `สัญญาณ Wi-Fi ของ ESP32 อ่อน (${d.rssi} dBm)` },
+];
+
+// ===========================================================================
+const $ = id => document.getElementById(id);
+const isDemo = new URLSearchParams(location.search).has("demo") || /YOUR-/.test(CONFIG.FIREBASE.databaseURL);
+let latest = null;
+let history = [];
+let selected = FIELDS[0].key;
+let chart;
+
+function fmtNum(v, dec) {
+  if (typeof v !== "number" || Number.isNaN(v)) return "–";
+  return v.toLocaleString("th-TH", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+function fmtDuration(s) {
+  if (typeof s !== "number") return "–";
+  const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+  return d ? `${d} วัน ${h} ชม.` : h ? `${h} ชม. ${m} นาที` : `${m} นาที ${Math.floor(s % 60)} วิ`;
+}
+function fmtTime(ts) {
+  return ts ? new Date(ts).toLocaleTimeString("th-TH", { hour12: false }) : "–";
+}
+function fmtField(f, v) { return f.format ? f.format(v) : fmtNum(v, f.dec); }
+function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+// --- build cards ------------------------------------------------------------
+function buildCards() {
+  $("cards").innerHTML = FIELDS.map(f => `
+    <button class="card${f.key === selected ? " selected" : ""}" data-key="${f.key}">
+      <div class="card-head"><span>${f.label}</span><span class="card-icon">${f.icon}</span></div>
+      <div class="value"><span class="num ${f.format ? "text" : "mono"}">–</span><span class="unit">${f.unit}</span></div>
+      <div class="meta"><span class="delta mono"></span><span class="range">${f.format ? "" : `ช่วง ${fmtNum(f.min, 0)}–${fmtNum(f.max, 0)}`}</span></div>
+      ${f.format ? "" : `<div class="bar"><i></i></div><svg class="spark" viewBox="0 0 100 34" preserveAspectRatio="none"><polyline points=""/></svg>`}
+    </button>`).join("");
+  document.querySelectorAll(".card").forEach(el => el.addEventListener("click", () => {
+    const f = FIELDS.find(x => x.key === el.dataset.key);
+    if (f.format) return;
+    selected = f.key;
+    document.querySelectorAll(".card").forEach(c => c.classList.toggle("selected", c === el));
+    renderChart();
+  }));
+}
+
+// --- render -------------------------------------------------------------------
+function renderLatest() {
+  if (!latest) return;
+  const prev = history.length > 1 ? history[history.length - 2] : null;
+  let okCount = 0, scored = 0;
+
+  for (const f of FIELDS) {
+    const el = document.querySelector(`.card[data-key="${f.key}"]`);
+    const v = latest[f.key];
+    const num = el.querySelector(".num");
+    const text = fmtField(f, v);
+    if (num.textContent !== text) {
+      num.textContent = text;
+      el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+    }
+    if (f.status && typeof v === "number") {
+      const s = f.status(v);
+      el.dataset.status = s;
+      scored++; if (s === "ok") okCount++;
+    }
+    if (!f.format && typeof v === "number") {
+      const pct = Math.max(0, Math.min(100, (v - f.min) / (f.max - f.min) * 100));
+      el.querySelector(".bar i").style.width = pct + "%";
+      const delta = el.querySelector(".delta");
+      const pv = prev && prev[f.key];
+      if (typeof pv === "number" && pv !== v) {
+        const diff = v - pv;
+        delta.textContent = `${diff > 0 ? "▲" : "▼"} ${fmtNum(Math.abs(diff), f.dec)}`;
+      } else { delta.textContent = "–"; }
+    }
+  }
+
+  // health score
+  const score = scored ? Math.round(okCount / scored * 100) : 0;
+  const ring = $("ring");
+  ring.style.setProperty("--p", score);
+  ring.style.setProperty("--c", score >= 80 ? "var(--ok)" : score >= 50 ? "var(--warn)" : "var(--bad)");
+  $("score").textContent = score;
+  $("healthLabel").textContent = score >= 80 ? "สภาพดี" : score >= 50 ? "ควรดูแล" : "ต้องแก้ไขด่วน";
+  $("healthSub").textContent = `ปกติ ${okCount} จาก ${scored} ค่า`;
+
+  // advice
+  const items = ADVICE.map(fn => fn(latest)).filter(Boolean);
+  $("advice").innerHTML = items.length
+    ? items.map(a => `<li class="${a.level}"><span class="tag">${a.level === "bad" ? "ด่วน" : "เตือน"}</span><span>${a.text}</span></li>`).join("")
+    : `<li class="ok"><span class="tag">ปกติ</span><span>ทุกค่าอยู่ในช่วงเหมาะสม ไม่ต้องทำอะไร</span></li>`;
+  updateClock();
+}
+
+function renderSparks() {
+  for (const f of FIELDS) {
+    if (f.format) continue;
+    const pts = history.map(r => r[f.key]).filter(v => typeof v === "number").slice(-30);
+    const poly = document.querySelector(`.card[data-key="${f.key}"] polyline`);
+    if (!poly || pts.length < 2) continue;
+    const lo = Math.min(...pts), hi = Math.max(...pts), span = hi - lo || 1;
+    poly.setAttribute("points", pts.map((v, i) => `${(i / (pts.length - 1) * 100).toFixed(1)},${(31 - (v - lo) / span * 28).toFixed(1)}`).join(" "));
+  }
+}
+
+function renderChart() {
+  const f = FIELDS.find(x => x.key === selected);
+  $("chartTitle").textContent = `${f.icon} ${f.label} ย้อนหลัง ${history.length} รายการ`;
+  const labels = history.map(r => fmtTime(r.ts));
+  const data = history.map(r => r[f.key] ?? null);
+  const accent = cssVar("--accent"), grid = cssVar("--grid"), muted = cssVar("--muted");
+  if (!chart) {
+    chart = new Chart($("chart"), {
+      type: "line",
+      data: { labels, datasets: [{ data, borderColor: accent, backgroundColor: accent + "22", fill: true, tension: .3, pointRadius: 0, pointHoverRadius: 4, borderWidth: 2 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+        interaction: { mode: "index", intersect: false },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${f.label}: ${fmtNum(c.parsed.y, f.dec)} ${f.unit}` } } },
+        scales: {
+          x: { ticks: { color: muted, maxTicksLimit: 8, maxRotation: 0 }, grid: { display: false } },
+          y: { ticks: { color: muted }, grid: { color: grid } },
+        },
+      },
+    });
+  } else {
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = data;
+    chart.options.plugins.tooltip.callbacks.label = c => `${f.label}: ${fmtNum(c.parsed.y, f.dec)} ${f.unit}`;
+    chart.update();
+  }
+}
+
+function renderTable() {
+  $("table").querySelector("thead").innerHTML =
+    `<tr><th>เวลา</th>${FIELDS.map(f => `<th>${f.label}${f.unit ? ` (${f.unit})` : ""}</th>`).join("")}</tr>`;
+  $("table").querySelector("tbody").innerHTML = history.slice(-10).reverse().map(r =>
+    `<tr><td class="mono">${fmtTime(r.ts)}</td>${FIELDS.map(f => `<td class="mono">${fmtField(f, r[f.key])}</td>`).join("")}</tr>`).join("");
+}
+
+function updateClock() {
+  if (!latest || !latest.ts) return;
+  const age = Math.max(0, Math.round((Date.now() - latest.ts) / 1000));
+  $("updated").textContent = `อัปเดตล่าสุด ${fmtTime(latest.ts)} (${age} วินาทีที่แล้ว)`;
+  if (isDemo) return setPill("demo", "โหมดสาธิต");
+  if (age > CONFIG.SEND_INTERVAL_S * 3) setPill("offline", "ESP32 ออฟไลน์");
+  else setPill("live", "Real-time");
+}
+function setPill(cls, text) { $("pill").className = "pill " + cls; $("pillText").textContent = text; }
+function showBanner(text, error) { const b = $("banner"); b.textContent = text; b.className = "banner show" + (error ? " error" : ""); }
+
+function setLatest(v) { latest = v; renderLatest(); }
+function setHistory(rows) { history = rows.filter(r => r && r.ts).sort((a, b) => a.ts - b.ts); renderSparks(); renderChart(); renderTable(); renderLatest(); }
+
+$("csvBtn").addEventListener("click", () => {
+  const head = ["time", ...FIELDS.map(f => f.key)];
+  const lines = history.map(r => [new Date(r.ts).toISOString(), ...FIELDS.map(f => r[f.key] ?? "")].join(","));
+  const blob = new Blob([[head.join(","), ...lines].join("\n")], { type: "text/csv" });
+  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `${CONFIG.DB_NAME}-history.csv` });
+  a.click(); URL.revokeObjectURL(a.href);
+});
+
+// --- data sources -------------------------------------------------------------
+async function startFirebase() {
+  const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+  const { getDatabase, ref, onValue, query, limitToLast } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js");
+  const db = getDatabase(initializeApp(CONFIG.FIREBASE));
+  const onErr = e => showBanner(`อ่าน Firebase ไม่ได้: ${e.message} — ตรวจ Rules ว่า ".read": true`, true);
+  onValue(ref(db, "latest"), s => s.exists() && setLatest(s.val()), onErr);
+  onValue(query(ref(db, "history"), limitToLast(CONFIG.HISTORY_POINTS)), s => {
+    const rows = []; s.forEach(c => { rows.push(c.val()); }); setHistory(rows);
+  }, onErr);
+}
+
+function startDemo() {
+  showBanner("โหมดสาธิต: ข้อมูลในหน้านี้สุ่มในเบราว์เซอร์ ยังไม่ได้ต่อ Firebase — ใส่ databaseURL ใน CONFIG แล้วหน้าจะแสดงข้อมูลจริงจาก ESP32");
+  const s = { temperature: 29, humidity: 66, soil: 48, light: 21000, co2: 720, water_level: 40, rssi: -62, uptime: 3600 };
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const step = () => {
+    s.temperature = +clamp(s.temperature + (Math.random() - .45) * .8, 22, 38).toFixed(1);
+    s.humidity = Math.round(clamp(s.humidity + (Math.random() - .5) * 3, 35, 95));
+    s.soil = s.soil < 20 ? 80 : Math.round(s.soil - .6 - Math.random() * .6);
+    s.light = Math.round(clamp(s.light + (Math.random() - .5) * 3000, 500, 60000));
+    s.co2 = Math.round(clamp(s.co2 + (Math.random() - .45) * 80, 400, 1800));
+    s.water_level = s.water_level < 5 ? 100 : Math.round(s.water_level - .2 - Math.random() * .3);
+    s.rssi = Math.round(clamp(s.rssi + (Math.random() - .5) * 4, -90, -45));
+    s.uptime += CONFIG.SEND_INTERVAL_S;
+    return { ...s, ts: Date.now() };
+  };
+  const seed = [];
+  for (let i = CONFIG.HISTORY_POINTS; i > 0; i--) seed.push({ ...step(), ts: Date.now() - i * CONFIG.SEND_INTERVAL_S * 1000 });
+  setHistory(seed); setLatest(seed[seed.length - 1]);
+  setInterval(() => { const r = step(); history.push(r); setHistory(history.slice(-CONFIG.HISTORY_POINTS)); setLatest(r); }, 2000);
+}
+
+// --- start --------------------------------------------------------------------
+$("dbName").textContent = `Firebase · ${CONFIG.DB_NAME}`;
+$("owner").textContent = CONFIG.OWNER;
+buildCards();
+setInterval(updateClock, 1000);
+if (isDemo) startDemo();
+else startFirebase().catch(e => showBanner(`โหลด Firebase ไม่สำเร็จ: ${e.message}`, true));
+</script>
+</body>
+</html>
